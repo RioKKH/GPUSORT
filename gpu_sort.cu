@@ -2,6 +2,10 @@
 #include <cstdlib>
 #include <ctime>
 #include <cuda_runtime.h>
+#include <cub/cub.cuh>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/sort.h>
 
 void bubbleSortCPU(int *data, int count)
 {
@@ -129,6 +133,12 @@ __global__ void quickSortKernel(int *data, int left, int right)
     quickSort(data, left, right);
 }
 
+
+__global__ void radixSort(int *data, int count)
+{
+}
+
+
 // 最初のcount要素と最後のcount要素を表示
 void printResult(int *data, int count)
 {
@@ -157,99 +167,144 @@ int copy_array(int *src, int *dst, int count)
 }
 
 
-int main()
+int main(int argc, char **argv)
 {
     const int arraySize = 512;
     int hostData[arraySize];
     int hostData_cpu[arraySize];
     int hostData_gpu[arraySize];
     int *deviceData;
+
     float bubbleElapsedTimeCPU = 0.0f;
     float bubbleElapsedTimeGPU = 0.0f;
     float quickElapsedTimeCPU = 0.0f;
     float quickElapsedTimeGPU = 0.0f;
+    float radixElapsedTimeGPU = 0.0f;
+
+    thrust::host_vector<int> h_vec(arraySize);
+    thrust::device_vector<int> d_vec(arraySize);
+
+    // これは、実行時に指定された回数だけ計測を繰り返すためのもの
+    // 通常は 1 回で十分
+    // 
+    int measureCount = argv[1] ? atoi(argv[1]) : 1;
 
     // イベントのクリエイト
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    // 乱数のシートを設定
-    srand(time(NULL));
-
-    // 配列を初期化
-    for (int i = 0; i < arraySize; i++)
+    for (int k = 0; k < measureCount; k++)
     {
-        hostData[i] = rand() % arraySize; // 0 から arraySize-1 の乱数を生成
+
+        // 乱数のシートを設定
+        srand(time(NULL));
+
+        // 配列を初期化
+        for (int i = 0; i < arraySize; i++)
+        {
+            hostData[i] = rand() % arraySize; // 0 から arraySize-1 の乱数を生成
+            h_vec[i] = hostData[i];
+        }
+
+        // 初期状態を表示
+#ifdef DEBUG
+        printf("Initial:");
+        printResult(hostData, 10);
+#endif
+
+        // CPUでバブルソートを実行 -----------------------------------------------
+        copy_array(hostData, hostData_cpu, arraySize);
+
+        cudaEventRecord(start, 0);
+        bubbleSortCPU(hostData_cpu, arraySize);
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&bubbleElapsedTimeCPU, start, stop);
+
+#ifdef DEBUG
+        printf("bubble_sort_cpu: ");
+        printResult(hostData_cpu, 10);
+#endif
+        // ---------------------------------------------------------------------------
+
+        // CPUでクイックソートを実行 -----------------------------------------------
+        copy_array(hostData, hostData_cpu, arraySize);
+
+        cudaEventRecord(start, 0);
+        quickSortCPU(hostData_cpu, 0, arraySize - 1);
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&quickElapsedTimeCPU, start, stop);
+
+#ifdef DEBUG
+        printf("quick_sort_cpu: ");
+        printResult(hostData_cpu, 10);
+#endif
+        // ---------------------------------------------------------------------------
+
+        // GPUでバブルソートを実行 -------------------------------------------------
+        cudaMalloc((void **)&deviceData, arraySize * sizeof(int));
+        cudaMemcpy(deviceData, hostData, arraySize * sizeof(int), cudaMemcpyHostToDevice);
+
+        cudaEventRecord(start, 0);
+
+        bubbleSort<<<1, 1>>>(deviceData, arraySize);
+
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&bubbleElapsedTimeGPU, start, stop);
+
+        cudaMemcpy(hostData_gpu, deviceData, arraySize * sizeof(int), cudaMemcpyDeviceToHost);
+
+#ifdef DEBUG
+        printf("bubble_sort_gpu: ");
+        printResult(hostData_gpu, 10);
+#endif
+        // ---------------------------------------------------------------------------
+
+        // GPUでクイックソートを実行 -------------------------------------------------
+        cudaMalloc((void **)&deviceData, arraySize * sizeof(int));
+        cudaMemcpy(deviceData, hostData, arraySize * sizeof(int), cudaMemcpyHostToDevice);
+
+        cudaEventRecord(start, 0);
+
+        quickSortKernel<<<1, 1>>>(deviceData, 0, arraySize - 1);
+
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&quickElapsedTimeGPU, start, stop);
+
+        cudaMemcpy(hostData_gpu, deviceData, arraySize * sizeof(int), cudaMemcpyDeviceToHost);
+
+#ifdef DEBUG
+        printf("quick_sort_gpu: ");
+        printResult(hostData_gpu, 10);
+#endif
+        // ---------------------------------------------------------------------------
+
+
+        // GPUでRADIX sortを実行 -------------------------------------------------
+        d_vec = h_vec;
+
+        cudaEventRecord(start, 0);
+        thrust::sort(d_vec.begin(), d_vec.end());
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&radixElapsedTimeGPU, start, stop);
+
+        thrust::copy(d_vec.begin(), d_vec.end(), h_vec.begin());
+#ifdef DEBUG
+        printf("RADIX_sort_gpu: ");
+        printResult(&h_vec[0], 10);
+#endif
+        // ---------------------------------------------------------------------------
+
+        printf("%f,%f,%f,%f,%f\n", 
+                bubbleElapsedTimeCPU, quickElapsedTimeCPU,
+                bubbleElapsedTimeGPU, quickElapsedTimeGPU,
+                radixElapsedTimeGPU);
     }
-
-    // 初期状態を表示
-    printf("Initial:");
-    printResult(hostData, 10);
-
-    // CPUでバブルソートを実行 -----------------------------------------------
-    copy_array(hostData, hostData_cpu, arraySize);
-
-    cudaEventRecord(start, 0);
-    bubbleSortCPU(hostData_cpu, arraySize);
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&bubbleElapsedTimeCPU, start, stop);
-
-    printf("bubble_sort_cpu: ");
-    printResult(hostData_cpu, 10);
-    // ---------------------------------------------------------------------------
-
-    // CPUでクイックソートを実行 -----------------------------------------------
-    copy_array(hostData, hostData_cpu, arraySize);
-
-    cudaEventRecord(start, 0);
-    quickSortCPU(hostData_cpu, 0, arraySize - 1);
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&quickElapsedTimeCPU, start, stop);
-
-    printf("quick_sort_cpu: ");
-    printResult(hostData_cpu, 10);
-    // ---------------------------------------------------------------------------
-
-    // GPUでバブルソートを実行 -------------------------------------------------
-    cudaMalloc((void **)&deviceData, arraySize * sizeof(int));
-    cudaMemcpy(deviceData, hostData, arraySize * sizeof(int), cudaMemcpyHostToDevice);
-
-    cudaEventRecord(start, 0);
-
-    bubbleSort<<<1, 1>>>(deviceData, arraySize);
-    cudaMemcpy(hostData_gpu, deviceData, arraySize * sizeof(int), cudaMemcpyDeviceToHost);
-
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&bubbleElapsedTimeGPU, start, stop);
-
-    printf("bubble_sort_gpu: ");
-    printResult(hostData_gpu, 10);
-    // ---------------------------------------------------------------------------
-
-    // GPUでクイックソートを実行 -------------------------------------------------
-    cudaMalloc((void **)&deviceData, arraySize * sizeof(int));
-    cudaMemcpy(deviceData, hostData, arraySize * sizeof(int), cudaMemcpyHostToDevice);
-
-    cudaEventRecord(start, 0);
-
-    quickSortKernel<<<1, 1>>>(deviceData, 0, arraySize - 1);
-    cudaMemcpy(hostData_gpu, deviceData, arraySize * sizeof(int), cudaMemcpyDeviceToHost);
-
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&quickElapsedTimeGPU, start, stop);
-
-    printf("quick_sort_gpu: ");
-    printResult(hostData_gpu, 10);
-    // ---------------------------------------------------------------------------
-
-    printf("Elapsed time: %f,%f,%f,%f\n", 
-            bubbleElapsedTimeCPU, quickElapsedTimeCPU,
-            bubbleElapsedTimeGPU, quickElapsedTimeGPU);
 
     cudaFree(deviceData);
     cudaEventDestroy(start);
