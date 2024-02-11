@@ -9,7 +9,7 @@ endif
 NVCC_OPTIONS = --generate-code arch=compute_$(ARCH),code=sm_$(ARCH)
 INCLUDES = -I$(CUDA_HOME)/include
 
-APPS = gpu_sort radix_sort
+APPS = gpu_sort radix_sort radix_pair_sort
 
 all: $(APPS)
 
