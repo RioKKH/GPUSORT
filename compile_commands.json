@@ -1,0 +1,32 @@
+[
+  {
+    "arguments": [
+      "/usr/local/cuda/bin/nvcc",
+      "-c",
+      "--generate-code",
+      "arch=compute_75,code=sm_75",
+      "-I/include",
+      "-o",
+      "gpu_sort.o",
+      "gpu_sort.cu"
+    ],
+    "directory": "/home/rio/work/git/GPUSORT",
+    "file": "/home/rio/work/git/GPUSORT/gpu_sort.cu",
+    "output": "/home/rio/work/git/GPUSORT/gpu_sort.o"
+  },
+  {
+    "arguments": [
+      "/usr/local/cuda/bin/nvcc",
+      "-c",
+      "--generate-code",
+      "arch=compute_75,code=sm_75",
+      "-I/include",
+      "-o",
+      "radix_sort.o",
+      "radix_sort.cu"
+    ],
+    "directory": "/home/rio/work/git/GPUSORT",
+    "file": "/home/rio/work/git/GPUSORT/radix_sort.cu",
+    "output": "/home/rio/work/git/GPUSORT/radix_sort.o"
+  }
+]
