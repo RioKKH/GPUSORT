@@ -42,7 +42,9 @@ int main()
             d_B, d_sorted_B, d_A, d_sorted_A, size);
 
     // ソートされたインデックスをホストにコピーする
+    int h_original_A[size];
     int h_sorted_A[size];
+    cudaMemcpy(h_original_A, d_A,      sizeof(int) * size, cudaMemcpyDeviceToHost);
     cudaMemcpy(h_sorted_A, d_sorted_A, sizeof(int) * size, cudaMemcpyDeviceToHost);
 
     // 上位N要素のインデックスを表示する
@@ -62,11 +64,29 @@ int main()
         << h_sorted_A[5] << std::endl;
     */
 
-    for (int i = 9; i > 4; i--)
+    std::cout << "h_original_A: ";
+    for (int i = 9; i >= 0; i--)
+    {
+        std::cout << h_original_A[i] << " ";
+    }
+    std::cout << std::endl;
+    for (int i = 9; i >= 0; i--)
+    {
+        std::cout << h_B[h_original_A[i]] << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "h_sorted_A: ";
+    for (int i = 9; i >= 0; i--)
     // for (int i = 0; i < N; i++)
     {
         // std::cout << i << " ";
         std::cout << h_sorted_A[i] << " ";
+    }
+    std::cout << std::endl;
+    for (int i = 9; i >= 0; i--)
+    {
+        std::cout << h_B[h_sorted_A[i]] << " ";
     }
     std::cout << std::endl;
 
