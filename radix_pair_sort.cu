@@ -11,7 +11,13 @@ int main()
     // このコードは配列Ｂをソートキーとして昇順にならびかえ、
     // 対応する配列Ａの値も同じ順にならびかえる
     int h_A[size] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    int h_B[size] = {900, 28, 17, 56, 45, 444, 23, 2, 125, 200}; // ソート基準の配列
+    int h_B[size] = {100, 90, 80, 70, 60, 50, 40, 30, 20, 10}; // ソート基準の配列
+    // ホスト側の配列
+    int *h_sorted_A = (int *)malloc(sizeof(int) * size);
+    int *h_sorted_B = (int *)malloc(sizeof(int) * size);
+    // ホスト側の戻り値を格納する配列
+    int *h_returned_A = (int *)malloc(sizeof(int) * size);
+    int *h_returned_B = (int *)malloc(sizeof(int) * size);
 
     // デバイス側の配列
     int *d_A, *d_B, *d_sorted_A, *d_sorted_B;
@@ -41,53 +47,25 @@ int main()
             d_temp_storage, temp_storage_bytes,
             d_B, d_sorted_B, d_A, d_sorted_A, size);
 
-    // ソートされたインデックスをホストにコピーする
-    int h_original_A[size];
-    int h_sorted_A[size];
-    cudaMemcpy(h_original_A, d_A,      sizeof(int) * size, cudaMemcpyDeviceToHost);
+    // ソートに使った配列をホスト側にコピー
+    cudaMemcpy(h_returned_A, d_A,      sizeof(int) * size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_returned_B, d_B,      sizeof(int) * size, cudaMemcpyDeviceToHost);
+
+    // ソートされた配列をホスト側にコピー
     cudaMemcpy(h_sorted_A, d_sorted_A, sizeof(int) * size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_sorted_B, d_sorted_B, sizeof(int) * size, cudaMemcpyDeviceToHost);
 
-    // 上位N要素のインデックスを表示する
-    std::cout << "Top " << N << " indices:" << std::endl;
-    /*
-    for (const auto &i : h_sorted_A)
-    {
-        std::cout << i << " ";
-    }
+    // 結果の表示
+    std::cout << "h_returned:" << std::endl;
+    for (int i = 0; i <= 9; i++) { std::cout << h_returned_A[i] << " "; }
     std::cout << std::endl;
-    */
-
-    /*
-    std::cout 
-        << h_sorted_A[9] << h_sorted_A[8] 
-        << h_sorted_A[7] << h_sorted_A[6]
-        << h_sorted_A[5] << std::endl;
-    */
-
-    std::cout << "h_original_A: ";
-    for (int i = 9; i >= 0; i--)
-    {
-        std::cout << h_original_A[i] << " ";
-    }
-    std::cout << std::endl;
-    for (int i = 9; i >= 0; i--)
-    {
-        std::cout << h_B[h_original_A[i]] << " ";
-    }
+    for (int i = 0; i <= 9; i++) { std::cout << h_returned_B[i] << " "; }
     std::cout << std::endl;
 
-    std::cout << "h_sorted_A: ";
-    for (int i = 9; i >= 0; i--)
-    // for (int i = 0; i < N; i++)
-    {
-        // std::cout << i << " ";
-        std::cout << h_sorted_A[i] << " ";
-    }
+    std::cout << "h_sorted: " << std::endl;
+    for (int i = 0; i <= 9; i++) { std::cout << h_sorted_A[i] << " "; }
     std::cout << std::endl;
-    for (int i = 9; i >= 0; i--)
-    {
-        std::cout << h_B[h_sorted_A[i]] << " ";
-    }
+    for (int i = 0; i <= 9; i++) { std::cout << h_sorted_B[i] << " "; }
     std::cout << std::endl;
 
     // メモリ解放
@@ -96,6 +74,12 @@ int main()
     cudaFree(d_sorted_A);
     cudaFree(d_sorted_B);
     cudaFree(d_temp_storage);
+
+    free(h_sorted_A);
+    free(h_sorted_B);
+    free(h_returned_A);
+    free(h_returned_B);
+
 
     return 0;
 }
